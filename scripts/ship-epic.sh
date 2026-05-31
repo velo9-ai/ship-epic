@@ -37,6 +37,10 @@
 
 set -euo pipefail
 
+# Ensure the Claude Code CLI is reachable even when the non-interactive / login PATH
+# omits the native-installer bin dir (headless SSH, cron, remote sessions, mac-mini).
+export PATH="$HOME/.local/bin:$HOME/.claude/local:$PATH"
+
 REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 # Project-independent: derive a slug from the repo dir so logs/state never collide
 # across projects and the box runs anywhere. Override dirs via env if desired.
