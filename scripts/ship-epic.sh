@@ -300,7 +300,7 @@ _run_ship_story() {
       --dangerously-skip-permissions \
       --output-format text \
       --max-turns 200 \
-      -p "/bmad-ship-story ${story_file}" \
+      -p "/bmad-ship-story ${story_file} --headless" \
       > "$log_file" 2>&1
   else
     claude \
@@ -308,7 +308,7 @@ _run_ship_story() {
       --dangerously-skip-permissions \
       --output-format text \
       --max-turns 200 \
-      -p "/bmad-ship-story ${story_file}" \
+      -p "/bmad-ship-story ${story_file} --headless" \
       > "$log_file" 2>&1
   fi
   exit_code=$?

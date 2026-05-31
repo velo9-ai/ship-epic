@@ -6,7 +6,7 @@ description: Autonomously implement, review, and commit a story. Chains DS → a
 
 Autonomously implement, review, and commit a single story without user interruption — except on genuine blockers (HALT conditions). One command from story to committed and sprint-status updated. **Works in any BMAD project** — no project-specific scripts required.
 
-**Headless / unattended.** Normally invoked by `ship-epic.sh` via `claude -p` — no human in the loop. Do NOT ask clarifying questions. Do NOT print prompts that expect input. If something truly blocks autonomous execution, emit exactly `SHIP-STORY HALT: <one-line reason>` and stop; the orchestrator's party-mode panel will diagnose and route.
+**Two modes.** When invoked with `--headless` (the way `ship-epic.sh` always calls you, via `claude -p` — no human in the loop): run fully autonomous, **skip Step 0**, never ask, never print a prompt that expects input. If something truly blocks, emit exactly `SHIP-STORY HALT: <one-line reason>` and stop; the orchestrator's party-mode panel diagnoses and routes. When invoked **without** `--headless` (a human ran you directly): begin with **Step 0 — Plan & Clarify**.
 
 **Branch policy.** Defaults to committing on the current branch (trunk-style). If `SHIP_BRANCH_MODE=topic` is set, create/commit on a `story/<id>` branch instead. Either way, never force-push, never `--no-verify`, never `--no-gpg-sign`.
 
@@ -32,6 +32,14 @@ A session that ends with a review report as its final response is a **FAILED RUN
 ## Procedure
 
 Execute sequentially without pausing unless a HALT condition fires.
+
+### Step 0 — Plan & clarify (interactive only — SKIP entirely if invoked with `--headless`)
+Before touching anything, state the plan in **3–5 lines**:
+- **Story**: id + title (the one given, or the first `ready` story you auto-detected).
+- **Chain**: dev-story → Tina (Gemini) + Cody (gpt-5.5) + Claude code-review → security → commit on `<branch>`.
+- **Gates**: what can HALT (security BLOCKED, new HIGH, reviewer FAIL, party-mode ESCALATE).
+
+Then ask a clarifying question **only if proceeding would risk building the wrong thing** — e.g. no story given and several are `ready` (which one?); the story has no/empty acceptance criteria; sprint-status and the story file disagree on status. Do **NOT** ask about anything you can reasonably decide yourself — this is a YOLO box, not a checklist. If nothing is genuinely ambiguous, print `No blockers — proceeding.` and continue. After Step 0, execute Steps 1–13 autonomously (no further questions; HALT on blockers per the contract).
 
 ### Step 1 — Implement
 If a story file path was given as `$ARGUMENTS`, use it. Else read `_bmad-output/implementation-artifacts/sprint-status.yaml`, find the first `status: ready` story, use its path.
