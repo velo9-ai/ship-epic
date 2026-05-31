@@ -1,0 +1,7 @@
+# Local BMad/agent tooling installed into this clone — not part of the repo
+.agent/
+.agents/
+.claude/
+.opencode/
+_bmad/
+_bmad-output/

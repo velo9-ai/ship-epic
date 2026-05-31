@@ -25,6 +25,7 @@ Gate 2 makes the system self-healing — even if every future inner session term
 
 - **`ship-epic-inner-gate.md`** — full architecture writeup with copy-paste-ready Bash snippets for the outer-loop gates and exact wording for the inner-loop contract. Plus portability notes (story formats, reviewer scripts, cross-repo apply checklist).
 - **`bmad-ship-story.md`** — the per-story slash command with the Termination Contract block + new HALT condition. Drop at `~/.claude/commands/bmad-ship-story.md` for user-level resolution, or at `.claude/commands/bmad-ship-story.md` for repo-local override.
+- **`reviewer-chain/`** — installable form of the Tina → Tom → Cody adversarial review chain: the two non-Claude reviewers as BMad skills (`bmad-code-review-gemini`/Gemini, `bmad-code-review-gpt55`/gpt-5.5) plus self-contained scripts that wire them into every project's `bmad-story-automator-review` flow. See [`reviewer-chain/README.md`](reviewer-chain/README.md).
 
 ## Installing in your repo
 
