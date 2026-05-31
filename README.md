@@ -24,7 +24,8 @@ Gate 2 makes the system self-healing — even if every future inner session term
 ## Files in this repo
 
 - **`ship-epic-inner-gate.md`** — full architecture writeup with copy-paste-ready Bash snippets for the outer-loop gates and exact wording for the inner-loop contract. Plus portability notes (story formats, reviewer scripts, cross-repo apply checklist).
-- **`bmad-ship-story.md`** — the per-story slash command with the Termination Contract block + new HALT condition. Drop at `~/.claude/commands/bmad-ship-story.md` for user-level resolution, or at `.claude/commands/bmad-ship-story.md` for repo-local override.
+- **`bmad-ship-story.md`** — the per-story slash command (Termination Contract + HALT). **Project-independent**: reviewers run as skills (`bmad-code-review-gemini`/`-gpt55`/`bmad-code-review`), not project-specific scripts; branch policy + co-author are generic/env-driven. Drop at `~/.claude/commands/bmad-ship-story.md` (user-level) and it works in any BMAD project.
+- **`scripts/ship-epic.sh`** — the unattended epic orchestrator (no tmux; `claude -p` per story → remote/headless-safe). Project-independent: log/state dirs derive from the repo slug, `test-gate.sh` optional, calls `/bmad-ship-story`. Install: copy to your repo's `scripts/`, run `bash scripts/ship-epic.sh --dry-run`. The 3 commit gates + party-mode failure vote are preserved.
 - **`reviewer-chain/`** — installable form of the Tina → Tom → Cody adversarial review chain: the two non-Claude reviewers as BMad skills (`bmad-code-review-gemini`/Gemini, `bmad-code-review-gpt55`/gpt-5.5) plus self-contained scripts that wire them into every project's `bmad-story-automator-review` flow. See [`reviewer-chain/README.md`](reviewer-chain/README.md).
 
 ## Installing in your repo
