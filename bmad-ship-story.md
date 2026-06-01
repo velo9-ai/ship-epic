@@ -1,5 +1,5 @@
 ---
-description: Autonomously implement, review, and commit a story. Chains DS → adversarial reviewers (Gemini/Tina + GPT-5.5/Cody) → Claude code-review → security → commit. Stops only on FAIL or new HIGH. Project-independent.
+description: Autonomously implement, review, and commit a story. Chains DS → Tina (Gemini) → Tom (Claude /code-review) → Cody (GPT-5.5) → security → commit. Stops only on FAIL or new HIGH. Project-independent.
 ---
 
 # bmad-ship-story (project-independent)
@@ -50,36 +50,39 @@ Invoke `/bmad-dev-story` with the story file path. Run to completion.
 `git status --porcelain`; stage changed files with `git add -- <files>`. **Exclude** `.env`/`*.env`/`*.secret`/`credentials*`/`*_rsa`/`*_ed25519`/`*.pem`/`*.key`. Do NOT use `git add -A`/`git add .` — enumerate explicitly. HALT on merge conflicts or unstageable files.
 
 ### Step 3 — Gemini review (Tina), pass 1
-Invoke the **bmad-code-review-gemini** skill on the staged diff (`git diff --cached`). Capture verdict + findings as "round-1 Gemini". If the skill reports its key/CLI is unavailable, note the skip and continue — the GPT-5.5 review (Step 4) is still required.
+Invoke the **bmad-code-review-gemini** skill on the staged diff (`git diff --cached`). Capture verdict + findings as "round-1 Tina". If the skill reports its key/CLI is unavailable, note the skip and continue — Step 4 is still required.
 
-### Step 4 — GPT-5.5 review (Cody), pass 1
-Invoke the **bmad-code-review-gpt55** skill on the staged diff. Capture verdict + findings as "round-1 GPT". If Codex is unavailable, note the skip and continue.
+### Step 4 — Claude code review (Tom), pass 1
+Invoke `/bmad-code-review` (or `/code-review` if unavailable) on the staged diff. Capture verdict + findings as "round-1 Tom". Fix any HIGH/FAIL findings inline and re-stage before proceeding to Step 5.
 
-### Step 5 — Claude code review
-Invoke `/bmad-code-review` (or `/code-review` if unavailable). Fix any blocking findings inline; re-stage after fixes.
+### Step 5 — GPT-5.5 review (Cody), pass 1
+Invoke the **bmad-code-review-gpt55** skill on the staged diff. Capture verdict + findings as "round-1 Cody". If Codex is unavailable, note the skip and continue.
 
 ### Step 6 — Security review
 Invoke `/security-review staged`. If `SECURITY VERDICT: BLOCKED` → **HALT**: surface CRITICAL/HIGH findings; do NOT commit.
 
 ### Step 7 — Route after pass 1
-- **Both PASS** (or a reviewer skipped due to infra + the other PASS) → skip to Step 11.
-- **Either FAIL, or any new HIGH** → fix the flagged issues inline (no DS re-run), re-stage, return to Step 3 (pass 2).
-- **Both CONCERNS (MED/LOW only)** → fix clearly-correct MED findings, re-stage, continue to Step 8.
+- **All three PASS** (or a reviewer skipped due to infra + the others PASS) → skip to Step 11.
+- **Any FAIL, or any new HIGH** → fix the flagged issues inline (no DS re-run), re-stage, return to Step 3 (pass 2).
+- **CONCERNS only (MED/LOW)** → fix clearly-correct MED findings, re-stage, continue to Step 8.
 
 ### Step 8 — Gemini review (Tina), pass 2
-Re-invoke **bmad-code-review-gemini** on the staged diff. Capture as "round-2 Gemini" (skip+note if unavailable).
+Re-invoke **bmad-code-review-gemini** on the staged diff. Capture as "round-2 Tina" (skip+note if unavailable).
 
-### Step 9 — GPT-5.5 review (Cody), pass 2
-Re-invoke **bmad-code-review-gpt55** on the staged diff. Capture as "round-2 GPT".
+### Step 9 — Claude code review (Tom), pass 2
+Re-invoke `/bmad-code-review` (or `/code-review`) on the staged diff. Capture as "round-2 Tom".
 
-### Step 10 — Final route
+### Step 10 — GPT-5.5 review (Cody), pass 2
+Re-invoke **bmad-code-review-gpt55** on the staged diff. Capture as "round-2 Cody".
+
+### Step 10a — Final route
 Classify round-2 findings vs round-1: **NEW** (different file:line AND category) vs **REPEAT**.
 - Any **NEW HIGH** → HALT. Any **FAIL** after pass 2 → HALT.
 - All remaining REPEAT or LOW-only → proceed; document each override in the commit message under "Reviewer overrides:".
-- Both PASS → proceed.
+- All PASS → proceed.
 
 ### Step 10b — Conflict arbitration (party mode)
-If reviewers disagree on a REPEAT MED finding, or one PASS / other CONCERNS after pass 2 (and it isn't a documented false positive): invoke `/bmad-party-mode --solo` per disputed finding — Architect + Senior Dev + The Spec each vote FIX or OVERRIDE, majority of 3 rules, no majority → ESCALATE.
+If reviewers disagree on a REPEAT MED finding, or any reviewer PASS / others CONCERNS after pass 2 (and it isn't a documented false positive): invoke `/bmad-party-mode --solo` per disputed finding — Architect + Senior Dev + The Spec each vote FIX or OVERRIDE, majority of 3 rules, no majority → ESCALATE.
 - **OVERRIDE** → proceed, document under "Party override:".
 - **FIX** → targeted fix, re-stage, re-run only the disagreeing reviewer; PASS/CONCERNS → Step 11.
 - **ESCALATE** → HALT.
@@ -102,6 +105,7 @@ Final line = the SHIP-STORY COMPLETE contract above.
 - `SECURITY VERDICT: BLOCKED`; any NEW HIGH after pass 2; either reviewer FAIL after pass 2; party-mode ESCALATE; unstageable changes; story `blocked`/`done`; no ready story found; or finished reviews but cannot/will not execute Steps 11–12 (emit `SHIP-STORY HALT: <reason>`).
 
 ## Notes
-- Reviewers are skills (`bmad-code-review-gemini`, `bmad-code-review-gpt55`, `bmad-code-review`) — installed per-project, portable, and they degrade gracefully when a key/CLI is absent.
+- **Review chain order: Tina → Tom → Cody → security.** Tom (Claude /code-review) runs after Tina so findings are addressed before Cody's external pass — Cody sees cleaner code and can focus on logic/contract issues the other two may have missed.
+- Reviewers are skills (`bmad-code-review-gemini`, `bmad-code-review-gpt55`, `/bmad-code-review` or `/code-review`) — installed per-project, portable, and they degrade gracefully when a key/CLI is absent.
 - The autonomy grant covers ONE story — do NOT start the next after completion.
 - "Fix inline" means targeted edits to flagged code, never a full DS re-run for pass-2 fixes.
