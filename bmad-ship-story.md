@@ -53,7 +53,7 @@ Invoke `/bmad-dev-story` with the story file path. Run to completion.
 Invoke the **bmad-code-review-gemini** skill on the staged diff (`git diff --cached`). Capture verdict + findings as "round-1 Tina". If the skill reports its key/CLI is unavailable, note the skip and continue — Step 4 is still required.
 
 ### Step 4 — Claude code review (Tom), pass 1
-Invoke `/bmad-code-review` (or `/code-review` if unavailable) on the staged diff. Capture verdict + findings as "round-1 Tom". Fix any HIGH/FAIL findings inline and re-stage before proceeding to Step 5.
+Invoke the **bmad-code-review** skill on the staged diff. Capture verdict + findings as "round-1 Tom". Fix any HIGH/FAIL findings inline and re-stage before proceeding to Step 5. If the bmad-code-review skill is unavailable, fall back to `/code-review high`.
 
 ### Step 5 — GPT-5.5 review (Cody), pass 1
 Invoke the **bmad-code-review-gpt55** skill on the staged diff. Capture verdict + findings as "round-1 Cody". If Codex is unavailable, note the skip and continue.
@@ -70,7 +70,7 @@ Invoke `/security-review staged`. If `SECURITY VERDICT: BLOCKED` → **HALT**: s
 Re-invoke **bmad-code-review-gemini** on the staged diff. Capture as "round-2 Tina" (skip+note if unavailable).
 
 ### Step 9 — Claude code review (Tom), pass 2
-Re-invoke `/bmad-code-review` (or `/code-review`) on the staged diff. Capture as "round-2 Tom".
+Re-invoke the **bmad-code-review** skill on the staged diff. Capture as "round-2 Tom". Fall back to `/code-review high` if unavailable.
 
 ### Step 10 — GPT-5.5 review (Cody), pass 2
 Re-invoke **bmad-code-review-gpt55** on the staged diff. Capture as "round-2 Cody".
@@ -106,6 +106,6 @@ Final line = the SHIP-STORY COMPLETE contract above.
 
 ## Notes
 - **Review chain order: Tina → Tom → Cody → security.** Tom (Claude /code-review) runs after Tina so findings are addressed before Cody's external pass — Cody sees cleaner code and can focus on logic/contract issues the other two may have missed.
-- Reviewers are skills (`bmad-code-review-gemini`, `bmad-code-review-gpt55`, `/bmad-code-review` or `/code-review`) — installed per-project, portable, and they degrade gracefully when a key/CLI is absent.
+- Reviewers are skills (`bmad-code-review-gemini`, `bmad-code-review`, `bmad-code-review-gpt55`) — installed per-project, portable, and they degrade gracefully when unavailable. Tom's fallback is `/code-review high`; Tina's fallback is to skip; Cody's fallback is to skip.
 - The autonomy grant covers ONE story — do NOT start the next after completion.
 - "Fix inline" means targeted edits to flagged code, never a full DS re-run for pass-2 fixes.
