@@ -103,8 +103,20 @@ else
   _ok "commands/bmad-ship-story.md symlinked"
 fi
 
+# commands/build-factory.md  →  ../projects/_shared/commands/build-factory.md
+if [[ -L "$CLAUDE_DIR/commands/build-factory.md" ]]; then
+  _ok "commands/build-factory.md symlink already in place"
+else
+  if [[ -e "$CLAUDE_DIR/commands/build-factory.md" ]]; then
+    _warn "commands/build-factory.md exists as a regular file — moving to .bak"
+    mv "$CLAUDE_DIR/commands/build-factory.md" "$CLAUDE_DIR/commands/build-factory.md.bak"
+  fi
+  ln -sf ../projects/_shared/commands/build-factory.md "$CLAUDE_DIR/commands/build-factory.md"
+  _ok "commands/build-factory.md symlinked"
+fi
+
 # Resolution chain check
-for p in "$CLAUDE_DIR/docs/ship-epic-inner-gate.md" "$CLAUDE_DIR/commands/bmad-ship-story.md"; do
+for p in "$CLAUDE_DIR/docs/ship-epic-inner-gate.md" "$CLAUDE_DIR/commands/bmad-ship-story.md" "$CLAUDE_DIR/commands/build-factory.md"; do
   if [[ -r "$p" ]] && head -c 1 "$p" >/dev/null 2>&1; then
     _ok "$(basename "$p") resolves cleanly"
   else
