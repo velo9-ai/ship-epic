@@ -20,10 +20,17 @@
 #   2. `_bmad-output/implementation-artifacts/sprint-status.yaml` exists with
 #      keys for each story.
 #   3. `scripts/test-gate.sh` exists — invoked after each successful ship.
-#   4. Reviewer scripts (`scripts/run_tina.sh`, `scripts/run_cody.sh`) +
-#      mandates (`.claude/agents/tina.md`, `.claude/agents/cody.md`) installed.
-#   5. Agent reviewer API keys in macOS Keychain (`google-ai-key` for Tina;
-#      ChatGPT subscription for Cody Codex CLI).
+#   4. Reviewers are NOT invoked by this script. ship-epic only calls
+#      `/bmad-ship-story` per story; the review gates (Tina = the
+#      `bmad-code-review-gemini` skill, Cody = `bmad-code-review-gpt55`,
+#      then `/bmad-code-review` + `/security-review`) run INSIDE
+#      /bmad-ship-story (its Steps 3-6, two passes). The legacy
+#      `run_tina.sh`/`run_cody.sh` wrappers are not part of this path.
+#   5. Reviewer creds (consumed by those skills): `google-ai-key` in the
+#      macOS Keychain (Tina/Gemini) + the `codex` CLI / ChatGPT subscription
+#      (Cody). Each reviewer degrades gracefully (skips + notes) if absent —
+#      so confirm both are present before an unattended run, or a gate may
+#      silently pass with a reviewer skipped.
 #
 # Usage:
 #   bash scripts/ship-epic.sh                     # ship all ready-for-dev stories
@@ -145,7 +152,7 @@ story_filter = sys.argv[3]
 text = status_file.read_text(errors="replace")
 # Minimal YAML: parse `<story-key>: <status>` lines under `development_status:`.
 in_dev = False
-story_re = re.compile(r'^\s+([0-9]+-[0-9]+[a-z0-9-]*)\s*:\s*([a-z-]+)\s*$', re.IGNORECASE)
+story_re = re.compile(r'^\s+([0-9]+-[0-9]+[a-z0-9-]*)\s*:\s*([a-z-]+)\s*(?:#.*)?$', re.IGNORECASE)
 for line in text.splitlines():
     if line.strip().startswith('development_status:'):
         in_dev = True
@@ -506,6 +513,42 @@ PYEOF
       echo ""
       continue
     fi
+  fi
+
+  # ── Commit-integrity guard (retry-path safety net) ─────────────────────────
+  # The first-attempt path runs Gate 1/2/3 (commit-verification + auto-commit of
+  # staged work). The RETRY path (above) re-runs the build but did NOT re-run
+  # that verification — so a retry that exits 0 with uncommitted work could be
+  # marked "done" with its code stranded in the working tree, which then trips
+  # the NEXT story's format gate and starves the one after (observed: Velocity
+  # 22-5 → 22-6/22-7 cascade). Belt-and-suspenders: before the gate, commit any
+  # uncommitted story CODE so the gate sees a clean tree, and refuse to proceed
+  # if nothing ever committed. Status docs under `_bmad-output/` are managed by
+  # this script (in-progress/done flips) and are expected dirty here — excluded.
+  CODE_DIRTY="$(git -C "$REPO_DIR" status --porcelain --untracked-files=all 2>/dev/null | grep -v '_bmad-output/' || true)"
+  if [[ -n "$CODE_DIRTY" ]]; then
+    echo "⚠ Commit-integrity guard: uncommitted code after build/retry — auto-committing before the gate:"
+    echo "$CODE_DIRTY" | sed 's/^/    /'
+    git -C "$REPO_DIR" add -A -- ':(exclude)_bmad-output' 2>/dev/null || git -C "$REPO_DIR" add -A
+    GUARD_TITLE="$(grep -m1 '^# Story ' "$STORY_FILE" 2>/dev/null | sed 's/^# Story [0-9]*\.[0-9]*: *//')"
+    GUARD_TITLE="${GUARD_TITLE:-${STORY_ID}}"
+    git -C "$REPO_DIR" commit -m "${GUARD_TITLE} (ship-epic commit-integrity guard)
+
+Auto-committed by ship-epic.sh: the inner /bmad-ship-story (or its retry)
+exited success but left code uncommitted. Reviewers passed per the story log.
+
+Story: ${STORY_ID}
+Story file: ${STORY_FILE}" 2>&1 | tail -3
+    POST_SHIP_SHA="$(git -C "$REPO_DIR" rev-parse HEAD 2>/dev/null || echo "$POST_SHIP_SHA")"
+  fi
+  if [[ "$PRE_SHIP_SHA" == "$POST_SHIP_SHA" ]]; then
+    echo "🛑 Commit-integrity guard: HEAD never advanced for ${STORY_ID} — nothing committed. Blocking."
+    _set_story_file_status "$STORY_FILE" "blocked" 2>/dev/null || true
+    _set_sprint_story_status "$STORY_ID" "blocked" 2>/dev/null || true
+    _record "$STORY_ID" "blocked" "no-commit-landed after ${BUILD_MIN}m"
+    (( BLOCKED++ )) || true
+    echo ""
+    continue
   fi
 
   # Build succeeded — run gate
